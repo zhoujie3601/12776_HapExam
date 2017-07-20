@@ -1,0 +1,331 @@
+<#include "include/header.html"/>
+
+<body>
+<script type="text/javascript">
+    var viewModel = kendo.observable({
+        model: {},
+        //  导出Excel函数
+        exportExcelFunction:function(e){
+            var exportConfig = {};
+            var columns = [];
+            var index = 0;
+            for(var i = 0; i<grid.columns.length;i++){
+                if(grid.columns[i].field != null){
+                    var columnInfo = {};
+                    columnInfo["name"] = grid.columns[i].field;
+                    columnInfo["title"] = grid.columns[i].title;
+                    columnInfo["width"] = grid.columns[i].width;
+                    var align = $('tbody').find('tr')[0].getElementsByTagName('td')[i].style.textAlign;
+                    if(align != null || align != ''){
+                        columnInfo["align"] = align;
+                    }
+                    if(dataSource.options.schema.model.fields[grid.columns[i].field] != null){
+                        columnInfo["type"] = dataSource.options.schema.model.fields[grid.columns[i].field].type;
+                    }
+                    columns[index] = columnInfo;
+                    index++;
+                }
+            }
+            exportConfig["columnsInfo"] = columns;
+            exportConfig["param"] = Hap.prepareQueryParameter(viewModel.model.toJSON());
+            exportConfig["fileName"] = "student";
+            var $inputImg = $('<input>').attr({name:"config",value:kendo.stringify(exportConfig)});
+            var $inputToken = $('<input>').attr({name:"${_csrf.parameterName}",value:"${_csrf.token}",type:"hidden"});
+            var $form = $("<form>");
+            $form.attr({
+                target : '_self', //默认在相同的框架下打开被链接的文档
+                method : 'post',
+                action : '${base.contextPath}/orders/export' //绑定后台方法
+
+            }).append($inputImg);
+            $form.append($inputToken);
+            $form.id = "smbForm";
+            $("#batchDiv").empty().append($form);//添加到隐藏div中
+            $form.submit();
+            $("#batchDiv").empty();
+
+        },
+
+        // orderStatusData:orderStatusData,
+        createFunction: function(){
+            $('#grid').data('kendoGrid').addRow();
+        },
+        saveFunction: function () {
+            $('#grid').data('kendoGrid').saveChanges();
+        },
+        queryResource: function (e) {
+            $('#grid').data('kendoGrid').dataSource.page(1);
+        }
+    });
+</script>
+<div id="dialogEdit" style="display: none"></div>
+<!--数据显示框-->
+<div id="page-content">
+    <div class="pull-left" id="toolbar-btn" style="padding-bottom:10px;">
+        <span class="btn btn-primary" style="float:left;margin-right:5px;"  data-bind="click:createFunction"><@spring.message "hap.new"/></span>
+        <span class="btn btn-primary" style="float:left;margin-right:5px;"  onclick="editFunctionResources()"><@spring.message "hap.edit"/></span>
+        <span class="btn btn-success k-grid-save-changes" style="float:left;margin-right:5px;" data-bind="click:saveFunction"><@spring.message "hap.save"/></span>
+        <span onclick="deleteData()" class="btn btn-danger" style="float:left;"><@spring.message "hap.delete"/></span>
+        <span class="btn btn-primary"  data-bind="click:excelFunction" style="width: 80px;float:left;margin-right:5px;" type="button">导出Excel</span>
+
+    </div>
+    <script>kendo.bind($('#toolbar-btn'), viewModel);</script>
+    <div class="pull-right" id="query-form" style="padding-bottom:10px;">
+        <input data-role="maskedtextbox" placeholder='<@spring.message "订单编号"/>' type="text" style="width: 150px;float:left;margin-right:5px;" data-bind="value:model.positionCode" class="k-textbox">
+        <input data-role="maskedtextbox" placeholder='<@spring.message "订单状态"/>' type="text" style="width: 150px;float:left;margin-right:5px;" data-bind="value:model.name"
+               class="k-textbox">
+        <span class="btn btn-primary" data-bind="click:queryResource" style="width: 80px;float:left;margin-right:5px;" type="submit"><@spring.message "hap.query"/></span>
+        <div style="clear:both"></div>
+    </div>
+    <script>kendo.bind($('#query-form'), viewModel);</script>
+    <div style="clear: both;">
+        <div id="grid"></div>
+    </div>
+</div>
+<!--隐藏div-->
+<div id="batchDiv" style="display: none"></div>
+
+<!--新建，编辑window-->
+<div id="editWin"></div>
+<div id="newWin"></div>
+<script type="text/javascript">
+
+    $('#query-form input').keydown(function (e) {
+        if (e.keyCode == 13) {
+            e.target.blur();
+            viewModel.queryResource(e);
+        }
+    });
+
+    //新建时调用的界面
+   /* window.editData = function(){
+        var url = 'editOrder.html';
+        var dialog =  $("#editWin").kendoWindow({
+            actions: [ "Maximize", "Minimize", "Close"],
+            width: 900,
+            height: 500,
+            title: '<@spring.message "order.order_edit"/>',
+            content: url,
+            iframe:  true,
+            visible: false,
+            modal:true,
+            close: function() {
+                //window 关闭  刷新 本页面的  grid
+                $('#grid').data('kendoGrid').dataSource.page(1);
+            }
+        }).data("kendoWindow");
+        dialog.center().open();
+    };
+    editFunctionResources= function(headerId){
+        //url传入headerId
+        //alert(headerId);
+     var url='editOrder.html?headerId='+headerId;
+     var dialog =  $("#editWin").kendoWindow({
+        actions: [ "Maximize", "Minimize", "Close"],
+        width: 900,
+        height: 500,
+        title: '<@spring.message "order.order_edit"/>',
+        content: url,
+        iframe:  true,
+        visible: false,
+        modal:true,
+        close: function() {
+            //window 关闭  刷新 本页面的  grid
+            $('#grid').data('kendoGrid').dataSource.page(1);
+        }
+    }).data("kendoWindow");
+        dialog.center().open();
+    };*/
+
+        dataSource = new kendo.data.DataSource({
+            transport: {
+                read: {
+                    url: "${base.contextPath}/orders/query",
+                    type    : "POST",
+                    dataType: "json"
+                },
+                create: {
+                    url: "${base.contextPath}/orders/submit",
+                    contentType: "application/json",
+                    type: "POST"
+                },
+                update: {
+                    url: "${base.contextPath}/orders/submit",
+                    contentType: "application/json",
+                    type: "POST"
+                },
+                destroy: {
+                    url: "${base.contextPath}/orders/remove",
+                    contentType: "application/json",
+                    type: "POST"
+                },
+                parameterMap: function (options, type) {
+                    if (type !== "read" && options.models) {
+                        var datas = Hap.prepareSubmitParameter(options, type);
+                        return kendo.stringify(datas);
+                    } else if (type === "read") {
+                        return Hap.prepareQueryParameter(viewModel.model.toJSON(), options);
+                    }
+                }
+            },
+            batch: true,
+            serverPaging: true,
+            pageSize: 10,
+            schema: {
+                data: 'rows',
+                total: 'total',
+                model: {
+                    id: "headerId",
+                    fields: {
+                        description: {type: "string"}
+                    }
+                }
+            }
+        });
+    var grid = $("#grid").kendoGrid({
+        dataSource: dataSource,
+        navigatable: true,
+        height: '100%',
+        resizable: true,
+        scrollable: true,
+        selectable:'multiple,rowbox',
+        pageable: {
+            pageSizes: [5,10, 20, 50,'All'],
+            refresh: true,
+            buttonCount: 10
+        },
+        columns: [
+            {
+                field: "orderNumber",
+                title: '销售订单编号',
+                width: 100,
+                headerAttributes: {
+                    "class": "table-header-cell",
+                    style: "text-align: center"
+                },
+                template: function (rowdata) {
+                    var Number=rowdata.orderNumber;
+                    var headerId=rowdata.headerId;
+                    return '<a href="javascript:void(0);" onclick="editFunctionResources(' + headerId + ')">'+Number+'</a>'
+                }
+            },
+            {
+                field: "companyName",
+                title: '公司名称',
+                width: 100,
+                headerAttributes: {
+                    "class": "table-header-cell",
+                    style: "text-align: center"
+                },
+                template : function (dataItem) {
+                return dataItem['companyName'] || '';
+                },
+               editor  : function (container, options) {
+                    $('<input required name="' + options.field + '"/>')
+                        .appendTo(container)
+                        .kendoLov($.extend(<@lov "LOV_COMPANYS"/>, {
+                        textField: 'companyName',
+                        valueField:'companyId',
+                        model    : options.model
+                    }));
+                }
+            },
+            {
+                field: "customerName",
+                title: '客户名称',
+                width: 100,
+                headerAttributes: {
+                    "class": "table-header-cell",
+                    style: "text-align: center"
+                },
+                template : function (dataItem) {
+                    return dataItem['customerName'] || '';
+                },
+                editor  : function (container, options) {
+                    $('<input required name="' + options.field + '"/>')
+                        .appendTo(container)
+                        .kendoLov($.extend(<@lov "LOV_CUSTOMERS"/>, {
+                        textField: 'customerName',
+                        valueField:'customerId',
+                        model    : options.model
+                    }));
+                }
+            },
+            {
+                field: "orderDate",
+                title: '订单日期',
+                width: 140,
+                format:"{0:yyyy-mm-dd}",
+                headerAttributes: {
+                    "class": "table-header-cell",
+                    style: "text-align: center"
+                }
+            },
+            {
+                field: "orderStatus",
+                title: '订单状态',
+                width: 140,
+                headerAttributes: {
+                    "class": "table-header-cell",
+                    style: "text-align: center"
+                }
+            },
+            {
+                field: "totalMoney",
+                title: '订单金额',
+                width: 140,
+                headerAttributes: {
+                    "class": "table-header-cell",
+                    style: "text-align: center"
+                }
+            }
+        ],
+        editable: "inline"
+    }).data("kendoGrid");
+
+    //删除函数
+    function deleteData() {
+
+        var checked = grid.selectedDataItems();
+        if(grid.selectedDataItems().length){
+            kendo.ui.showConfirmDialog({
+                title:$l('hap.tip.info'),
+                message: $l('hap.tip.delete_confirm')
+            }).done(function (event) {
+                if (event.button == 'OK') {
+                    $.each(checked,function(i,v){
+                        grid.dataSource.remove(v)
+                    })
+                    grid.dataSource.sync();
+                }
+            })
+        }else{
+            kendo.ui.showInfoDialog({
+                message: $l('hap.tip.selectrow')
+            })
+        }
+    }
+
+    //编辑函数
+    function editFunctionResources(){
+        var checked = grid.selectedDataItems();
+        if(checked.length == 1){
+            var data = grid.dataItem(grid.select());
+            grid.editRow(data);
+        }else{
+            kendo.ui.showInfoDialog({
+                message: $l('hap.tip.selectrow')
+            })
+        }
+    }
+
+
+
+
+    //自动根据当前屏幕大小调整表格
+    Hap.autoResizeGrid("#grid");
+
+</script>
+
+</body>
+</html>
